@@ -124,6 +124,6 @@ function broadcast(data) {
 
 /* start */
 
-server.listen(3000, () => {
+server.listen(8080, () => {
     console.log("Server running http://localhost:3000")
 })
