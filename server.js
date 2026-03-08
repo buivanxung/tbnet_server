@@ -14,7 +14,7 @@ app.use(express.static("public"))
 
 const pool = new Pool({
     host: "localhost",
-    user: "postgres",
+    user: "tbnet",
     password: "88888888",
     database: "iot",
     port: 5432
