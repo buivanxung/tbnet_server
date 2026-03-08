@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+    <meta charset="utf-8">
+    <title>Power Monitoring SCADA</title>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+    <style>
+        body {
+            background: #0b1220;
+            color: white;
+            font-family: Arial;
+            margin: 0;
+        }
+
+        header {
+            background: #111a2e;
+            padding: 15px;
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        .container {
+            padding: 20px;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+        }
+
+        /* card */
+
+        .card {
+            background: #16223b;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+        }
+
+        .value {
+            font-size: 28px;
+            margin-top: 10px;
+        }
+
+        .icon {
+            font-size: 28px;
+        }
+
+        /* relay */
+
+        .relay-panel {
+            display: flex;
+            justify-content: space-around;
+        }
+
+        .light {
+            width: 25px;
+            height: 25px;
+            border-radius: 50%;
+            background: #333;
+            margin: auto;
+        }
+
+        .light.on {
+            background: #ff3b3b;
+            box-shadow: 0 0 10px red;
+        }
+
+        /* battery */
+
+        .battery-high {
+            color: #4caf50;
+        }
+
+        .battery-mid {
+            color: #ffc107;
+        }
+
+        .battery-low {
+            color: #ff3b3b;
+        }
+
+        /* source */
+
+        .source-ac {
+            color: #4caf50;
+        }
+
+        .source-battery {
+            color: #ffc107;
+        }
+
+        /* interface */
+
+        .interface-wifi {
+            color: #4fc3f7;
+        }
+
+        .interface-4g {
+            color: #81c784;
+        }
+
+        /* charts */
+
+        .chart-box {
+            grid-column: span 2;
+            background: #16223b;
+            padding: 20px;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        ⚡ POWER DEVICE MONITORING SCADA
+    </header>
+
+    <div class="container">
+
+        <div class="card">
+            <i class="fa fa-barcode icon"></i>
+            <div>Serial</div>
+            <div id="serial" class="value">-</div>
+        </div>
+
+        <div class="card">
+            <i class="fa fa-battery-half icon"></i>
+            <div>Battery</div>
+            <div id="battery" class="value">-</div>
+        </div>
+
+        <div class="card">
+            <i class="fa fa-plug icon"></i>
+            <div>Source</div>
+            <div id="source" class="value">-</div>
+        </div>
+
+        <div class="card">
+            <i class="fa fa-bolt icon"></i>
+            <div>Charging</div>
+            <div id="charging" class="value">-</div>
+        </div>
+
+        <div class="card">
+            <div>CPU Temp</div>
+            <div id="cpu_temp" class="value">-</div>
+        </div>
+
+        <div class="card">
+            <div>Board Temp</div>
+            <div id="board_temp" class="value">-</div>
+        </div>
+
+        <div class="card">
+            <div>WiFi</div>
+            <div id="wifi_status" class="value">-</div>
+        </div>
+
+        <div class="card">
+            <div>4G</div>
+            <div id="g4_status" class="value">-</div>
+        </div>
+
+        <div class="card relay-panel">
+
+            <div>
+                <div>NO</div>
+                <div id="no_light" class="light"></div>
+            </div>
+
+            <div>
+                <div>NC</div>
+                <div id="nc_light" class="light"></div>
+            </div>
+
+        </div>
+
+        <div class="card">
+            <div>Interface</div>
+            <div id="interface" class="value">-</div>
+        </div>
+
+        <div class="chart-box">
+            <canvas id="tempChart"></canvas>
+        </div>
+
+        <div class="chart-box">
+            <canvas id="batteryChart"></canvas>
+        </div>
+
+    </div>
+
+    <script>
+
+        let ws = new WebSocket("ws://" + location.host)
+
+        let tempChart = new Chart(
+            document.getElementById("tempChart"),
+            {
+                type: "line",
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: "CPU Temp",
+                            data: [],
+                            borderColor: "#ff5252"
+                        },
+                        {
+                            label: "Board Temp",
+                            data: [],
+                            borderColor: "#4fc3f7"
+                        }
+                    ]
+                }
+            })
+
+        let batteryChart = new Chart(
+            document.getElementById("batteryChart"),
+            {
+                type: "line",
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: "Battery %",
+                            data: [],
+                            borderColor: "#4caf50"
+                        }
+                    ]
+                }
+            })
+
+        ws.onmessage = function (event) {
+
+            let d = JSON.parse(event.data)
+
+            serial.innerText = d.serial
+
+            battery.innerText = d.battery + "%"
+
+            if (d.battery > 60)
+                battery.className = "value battery-high"
+            else if (d.battery > 30)
+                battery.className = "value battery-mid"
+            else
+                battery.className = "value battery-low"
+
+            source.innerText = d.source
+
+            if (d.source == "AC")
+                source.className = "value source-ac"
+            else
+                source.className = "value source-battery"
+
+            charging.innerText = d.charging
+
+            cpu_temp.innerText = d.temp_cpu + " °C"
+            board_temp.innerText = d.temp_board + " °C"
+
+            wifi_status.innerText = d.wifi
+            g4_status.innerText = d.g4
+
+            /* relay */
+
+            if (d.no_status == 1)
+                no_light.classList.add("on")
+            else
+                no_light.classList.remove("on")
+
+            if (d.nc_status == 1)
+                nc_light.classList.add("on")
+            else
+                nc_light.classList.remove("on")
+
+            /* interface */
+
+            interface.innerText = d.active_interface
+
+            if (d.active_interface == "WiFi")
+                interface.className = "value interface-wifi"
+            else
+                interface.className = "value interface-4g"
+
+            /* charts */
+
+            let time = new Date().toLocaleTimeString()
+
+            tempChart.data.labels.push(time)
+            tempChart.data.datasets[0].data.push(d.temp_cpu)
+            tempChart.data.datasets[1].data.push(d.temp_board)
+
+            batteryChart.data.labels.push(time)
+            batteryChart.data.datasets[0].data.push(d.battery)
+
+            if (tempChart.data.labels.length > 20) {
+
+                tempChart.data.labels.shift()
+                tempChart.data.datasets[0].data.shift()
+                tempChart.data.datasets[1].data.shift()
+
+                batteryChart.data.labels.shift()
+                batteryChart.data.datasets[0].data.shift()
+
+            }
+
+            tempChart.update()
+            batteryChart.update()
+
+        }
+
+    </script>
+
+</body>
+
+</html>
