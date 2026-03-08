@@ -22,14 +22,27 @@ const pool = new Pool({
 
 /* MQTT */
 
-const mqttClient = mqtt.connect("mqtt://ippbx.vnpt.vn:80", {
+const mqttClient = mqtt.connect("mqtts://ippbx.vnpt.vn:80", {
     username: "ebutton01",
     password: "Btn@dmo728"
 })
 
+
+mqttClient.on("error", (err) => {
+    console.log("MQTT error:", err)
+})
+
+mqttClient.on("reconnect", () => {
+    console.log("MQTT reconnecting...")
+})
+
+mqttClient.on("offline", () => {
+    console.log("MQTT offline")
+})
+
 mqttClient.on("connect", () => {
     console.log("MQTT connected")
-    mqttClient.subscribe("device/data")
+    mqttClient.subscribe("/tbnet/data")
 })
 
 /* MQTT message */
