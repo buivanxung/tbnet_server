@@ -17,7 +17,7 @@ const pool = new Pool({
     user: "tbnet",
     password: "tbnet123",
     database: "iot",
-    port: 5432
+    port: 5433
 })
 
 /* MQTT */
