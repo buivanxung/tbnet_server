@@ -4,7 +4,7 @@
 <head>
 
     <meta charset="utf-8">
-    <title>PCCC Monitoring</title>
+    <title>TBNET PCCC Monitoring</title>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
@@ -43,12 +43,8 @@
         }
 
         .value {
-            font-size: 28px;
+            font-size: 26px;
             margin-top: 10px;
-        }
-
-        .icon {
-            font-size: 28px;
         }
 
         /* relay */
@@ -71,40 +67,6 @@
             box-shadow: 0 0 10px red;
         }
 
-        /* battery */
-
-        .battery-high {
-            color: #4caf50;
-        }
-
-        .battery-mid {
-            color: #ffc107;
-        }
-
-        .battery-low {
-            color: #ff3b3b;
-        }
-
-        /* source */
-
-        .source-ac {
-            color: #4caf50;
-        }
-
-        .source-battery {
-            color: #ffc107;
-        }
-
-        /* interface */
-
-        .interface-wifi {
-            color: #4fc3f7;
-        }
-
-        .interface-4g {
-            color: #81c784;
-        }
-
         /* charts */
 
         .chart-box {
@@ -113,37 +75,61 @@
             padding: 20px;
             border-radius: 10px;
         }
+
+        /* alarm popup */
+
+        .alarm {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 999;
+        }
+
+        .alarm-box {
+            background: #ff2d2d;
+            padding: 40px;
+            border-radius: 10px;
+            font-size: 28px;
+            text-align: center;
+        }
     </style>
+
 </head>
 
 <body>
 
     <header>
-        ⚡ TBNET PCCC DEVICE MONITORING
+        🔥 TBNET PCCC DEVICE MONITORING
     </header>
 
     <div class="container">
 
         <div class="card">
-            <i class="fa fa-barcode icon"></i>
+            <i class="fa fa-barcode"></i>
             <div>Serial</div>
             <div id="serial" class="value">-</div>
         </div>
 
         <div class="card">
-            <i class="fa fa-battery-half icon"></i>
+            <i class="fa fa-battery-half"></i>
             <div>Battery</div>
             <div id="battery" class="value">-</div>
         </div>
 
         <div class="card">
-            <i class="fa fa-plug icon"></i>
+            <i class="fa fa-plug"></i>
             <div>Source</div>
             <div id="source" class="value">-</div>
         </div>
 
         <div class="card">
-            <i class="fa fa-bolt icon"></i>
+            <i class="fa fa-bolt"></i>
             <div>Charging</div>
             <div id="charging" class="value">-</div>
         </div>
@@ -197,9 +183,144 @@
 
     </div>
 
+    <!-- FIRE ALARM POPUP -->
+
+    <div id="alarm" class="alarm">
+
+        <div class="alarm-box">
+
+            🔥 FIRE ALARM
+
+            <br><br>
+
+            <div id="alarm_text"></div>
+
+            <br>
+
+            <button onclick="closeAlarm()">ACK</button>
+
+        </div>
+
+    </div>
+
     <script>
 
-        let ws = new WebSocket("ws://152.42.216.220:8080")
+        let ws
+
+        function connectWS() {
+
+            ws = new WebSocket("ws://" + location.host)
+
+            ws.onopen = () => {
+
+                console.log("WS connected")
+
+            }
+
+            ws.onclose = () => {
+
+                console.log("WS reconnecting...")
+
+                setTimeout(connectWS, 3000)
+
+            }
+
+            ws.onmessage = (event) => {
+
+                let d = JSON.parse(event.data)
+
+                /* fire alarm */
+
+                if (d.type === "fire_alarm") {
+
+                    alarm_text.innerText =
+                        "ZONE " + d.zone +
+                        " (" + d.source + ")"
+
+                    document.getElementById("alarm").style.display = "flex"
+
+                    return
+
+                }
+
+                /* serial */
+
+                serial.innerText = d.serial ?? "-"
+
+                /* battery */
+
+                battery.innerText = d.battery ? d.battery + "%" : "-"
+
+                if (d.battery > 60)
+                    battery.style.color = "#4caf50"
+                else if (d.battery > 30)
+                    battery.style.color = "#ffc107"
+                else
+                    battery.style.color = "#ff5252"
+
+                /* source */
+
+                source.innerText = d.source ?? "-"
+
+                /* charging */
+
+                charging.innerText = d.charging ?? "-"
+
+                /* temp */
+
+                cpu_temp.innerText = d.temp_cpu ? d.temp_cpu + " °C" : "-"
+
+                board_temp.innerText = d.temp_board ? d.temp_board + " °C" : "-"
+
+                /* wifi */
+
+                if (d.wifi_ssid)
+
+                    wifi_status.innerText =
+                        d.wifi_ssid + " (" + d.wifi + " dBm)"
+
+                else
+
+                    wifi_status.innerText = "-"
+
+                /* 4G */
+
+                if (d.operator)
+
+                    g4_status.innerText =
+                        d.operator + " (" + d.g4 + " dBm)"
+
+                else
+
+                    g4_status.innerText = "-"
+
+                /* relay */
+
+                if (d.no_status == 1)
+                    no_light.classList.add("on")
+                else
+                    no_light.classList.remove("on")
+
+                if (d.nc_status == 1)
+                    nc_light.classList.add("on")
+                else
+                    nc_light.classList.remove("on")
+
+                /* interface */
+
+                interface.innerText = d.active_interface ?? "-"
+
+                /* charts */
+
+                updateCharts(d)
+
+            }
+
+        }
+
+        connectWS()
+
+        /* charts */
 
         let tempChart = new Chart(
             document.getElementById("tempChart"),
@@ -238,58 +359,7 @@
                 }
             })
 
-        ws.onmessage = function (event) {
-
-            let d = JSON.parse(event.data)
-
-            serial.innerText = d.serial
-
-            battery.innerText = d.battery + "%"
-
-            if (d.battery > 60)
-                battery.className = "value battery-high"
-            else if (d.battery > 30)
-                battery.className = "value battery-mid"
-            else
-                battery.className = "value battery-low"
-
-            source.innerText = d.source
-
-            if (d.source == "AC")
-                source.className = "value source-ac"
-            else
-                source.className = "value source-battery"
-
-            charging.innerText = d.charging
-
-            cpu_temp.innerText = d.temp_cpu + " °C"
-            board_temp.innerText = d.temp_board + " °C"
-
-            wifi_status.innerText = d.wifi
-            g4_status.innerText = d.g4
-
-            /* relay */
-
-            if (d.no_status == 1)
-                no_light.classList.add("on")
-            else
-                no_light.classList.remove("on")
-
-            if (d.nc_status == 1)
-                nc_light.classList.add("on")
-            else
-                nc_light.classList.remove("on")
-
-            /* interface */
-
-            interface.innerText = d.active_interface
-
-            if (d.active_interface == "WiFi")
-                interface.className = "value interface-wifi"
-            else
-                interface.className = "value interface-4g"
-
-            /* charts */
+        function updateCharts(d) {
 
             let time = new Date().toLocaleTimeString()
 
@@ -303,6 +373,7 @@
             if (tempChart.data.labels.length > 20) {
 
                 tempChart.data.labels.shift()
+
                 tempChart.data.datasets[0].data.shift()
                 tempChart.data.datasets[1].data.shift()
 
@@ -313,6 +384,14 @@
 
             tempChart.update()
             batteryChart.update()
+
+        }
+
+        /* alarm */
+
+        function closeAlarm() {
+
+            document.getElementById("alarm").style.display = "none"
 
         }
 
