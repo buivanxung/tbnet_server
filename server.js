@@ -27,22 +27,13 @@ const mqttClient = mqtt.connect("mqtts://ippbx.vnpt.vn:80", {
     password: "Btn@dmo728"
 })
 
-
-mqttClient.on("error", (err) => {
-    console.log("MQTT error:", err)
-})
-
-mqttClient.on("reconnect", () => {
-    console.log("MQTT reconnecting...")
-})
-
-mqttClient.on("offline", () => {
-    console.log("MQTT offline")
-})
-
 mqttClient.on("connect", () => {
     console.log("MQTT connected")
     mqttClient.subscribe("/tbnet/data")
+})
+
+mqttClient.on("error", err => {
+    console.log("MQTT error:", err)
 })
 
 /* MQTT message */
@@ -51,23 +42,41 @@ mqttClient.on("message", async (topic, message) => {
 
     try {
 
-        let data = JSON.parse(message.toString())
+        const raw = JSON.parse(message.toString())
+
+        const payload = raw.data.payload
+
+        const data = {
+            serial: raw.header.serial_number,
+            battery: payload.power.battery_level,
+            charging: payload.power.charging_status,
+            source: payload.power.source,
+            temp_cpu: parseFloat(payload.power.temp_cpu),
+            temp_board: parseFloat(payload.power.temp_board),
+            wifi: payload.connection.wifi.rssi,
+            g4: payload.connection.cellular.rssi,
+            no_status: payload.no_status,
+            nc_status: payload.nc_status,
+            active_interface: payload.connection.active_interface
+        }
+
+        console.log("MQTT DATA:", data)
 
         await pool.query(
             `INSERT INTO device_data(
-serial,
-battery,
-charging,
-source,
-temp_cpu,
-temp_board,
-wifi,
-g4,
-no_status,
-nc_status,
-active_interface
-)
-VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+        serial,
+        battery,
+        charging,
+        source,
+        temp_cpu,
+        temp_board,
+        wifi,
+        g4,
+        no_status,
+        nc_status,
+        active_interface
+      )
+      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
             [
                 data.serial,
                 data.battery,
@@ -86,7 +95,9 @@ VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
         broadcast(data)
 
     } catch (err) {
+
         console.log("MQTT parse error", err)
+
     }
 
 })
@@ -101,8 +112,8 @@ wss.on("connection", async (ws) => {
 
         const result = await pool.query(
             `SELECT * FROM device_data
-ORDER BY id DESC
-LIMIT 1`
+       ORDER BY id DESC
+       LIMIT 1`
         )
 
         if (result.rows.length > 0) {
@@ -119,7 +130,7 @@ LIMIT 1`
 
 })
 
-/* broadcast realtime */
+/* broadcast */
 
 function broadcast(data) {
 
@@ -137,6 +148,6 @@ function broadcast(data) {
 
 /* start */
 
-server.listen(8080, () => {
-    console.log("Server running http://localhost:3000")
+server.listen(8080, "0.0.0.0", () => {
+    console.log("Server running http://152.42.216.220:8080")
 })
